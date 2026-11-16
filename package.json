@@ -1,0 +1,13 @@
+{
+  "name": "bilavoice2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "BilaVoice Voice-CVNSS4.0 experimental GitHub Pages laboratory",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "check": "node --check assets/app.js && node --check src/voice-bridge.js",
+    "start": "python -m http.server 8000"
+  },
+  "engines": {"node": ">=18"}
+}
