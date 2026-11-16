@@ -76,10 +76,10 @@ def health():
 
 @app.post("/api/tts")
 def infer_tts(
+    request: Request,
     text: str = Form(...),
     consent: bool = Form(False),
     reference: UploadFile = File(...),
-    request: Request = None,
 ):
     if os.environ.get("BILAVOICE_ENABLE_LOCAL_SDK") != "1":
         raise HTTPException(503, "Local SDK đang tắt; dùng Cloud v4 hoặc bật BILAVOICE_ENABLE_LOCAL_SDK=1.")
