@@ -29,14 +29,20 @@ class SpeechInput(BaseModel):
     voice: str = Field(default="", max_length=120)
 
 
-def require_access(request: Request):
-    key = os.environ.get("VIENEU_API_KEY", "").strip()
+def require_client_token(request: Request):
     access = os.environ.get("BILAVOICE_CLIENT_TOKEN", "").strip()
-    if not key or not access:
-        raise HTTPException(503, "Cloud backend chưa có VIENEU_API_KEY hoặc BILAVOICE_CLIENT_TOKEN.")
+    if not access:
+        raise HTTPException(503, "Backend chưa thiết lập BILAVOICE_CLIENT_TOKEN.")
     token = request.headers.get("X-BilaVoice-Token", "")
     if not secrets.compare_digest(token, access):
         raise HTTPException(401, "Thiếu token truy cập BilaVoice backend.")
+
+
+def require_access(request: Request):
+    require_client_token(request)
+    key = os.environ.get("VIENEU_API_KEY", "").strip()
+    if not key:
+        raise HTTPException(503, "Cloud backend chưa có VIENEU_API_KEY.")
     # Demonstration-level limit only. Use shared rate limits + real auth in production.
     now = time.monotonic()
     window = _window[request.client.host if request.client else "unknown"]
@@ -46,7 +52,6 @@ def require_access(request: Request):
         raise HTTPException(429, "Giới hạn thử nghiệm: tối đa 5 yêu cầu/phút.")
     window.append(now)
     return key
-
 
 def _call_vieneu(path: str, api_key: str, body: dict | None, max_size: int):
     headers = {"X-API-Key": api_key, "Accept": "application/json"}
