@@ -71,6 +71,19 @@
           <button id="cloneButton" class="button accent full" type="button">✦ Tạo giọng bằng VieNeu</button>
           <audio id="cloneOutput" controls hidden></audio>
           <p class="hint">Mẫu chỉ được gửi khi bấm nút tạo giọng. Vui lòng không sử dụng để mạo danh hoặc nhân bản giọng người khác khi chưa được phép.</p>
+          <div class="separator"><span>VIENEU CLOUD API v4 / KHÔNG CẦN GPU</span></div>
+          <p class="hint">Dịch vụ MCP công khai: <a href="https://api.vieneu.io/mcp" target="_blank" rel="noopener"><code>https://api.vieneu.io/mcp</code></a>. Để tạo giọng trực tiếp trong BilaVoice, backend sử dụng <code>https://api.vieneu.io/api/v1/audio/speech</code>. Hai giao thức này khác nhau.</p>
+          <p class="hint">Cloud v4 sử dụng giọng có sẵn hoặc giọng đã đăng ký trên <a href="https://vieneu.io/#/clone" target="_blank" rel="noopener">VieNeu Studio</a>; không upload mẫu WAV lên Cloud API qua ô này. Khóa VieNeu phải nằm ở biến môi trường máy chủ.</p>
+          <label class="field-label top-gap" for="cloudToken">Token truy cập backend BilaVoice (không phải VieNeu API key)</label>
+          <input id="cloudToken" type="password" placeholder="Token riêng của dịch vụ proxy; chỉ giữ trong phiên trang" autocomplete="off">
+          <div class="controls">
+            <button class="button outline" id="cloudVoicesButton" type="button">↻ Tải danh sách giọng Cloud</button>
+          </div>
+          <label class="field-label top-gap" for="cloudVoice">Giọng VieNeu v4</label>
+          <select id="cloudVoice"><option value="">Giọng mặc định (hãy tải danh sách nếu muốn chọn)</option></select>
+          <button class="button accent full" id="cloudTtsButton" type="button">▶ Tạo giọng bằng VieNeu Cloud v4</button>
+          <audio id="cloudAudio" controls hidden></audio>
+          <p class="hint">Chế độ Cloud có giới hạn 100 từ/lần cho khóa thử nghiệm, tính token theo chính sách VieNeu. Proxy yêu cầu xác thực và giới hạn yêu cầu để tránh bị khai thác khi trang GitHub Pages công khai.</p>
         </article>
       </div>
       <div id="appStatus" class="status" role="status" aria-live="polite">Sẵn sàng. Mời thử nhập văn bản hoặc bật microphone.</div>
