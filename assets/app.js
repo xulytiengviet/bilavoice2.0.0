@@ -8,7 +8,7 @@
   const $ = id => document.getElementById(id);
   const statusBox = $("appStatus");
   let latest = null, fskBytes = null, fskSamples = null;
-  let fskUrl = null, refUrl = null, cloneUrl = null;
+  let fskUrl = null, refUrl = null, cloneUrl = null, cloudUrl = null;
   let recognition = null, validatedReference = null;
   let voices = [];
   const ctxRing = $("ring").getContext("2d");
@@ -208,6 +208,66 @@
     }catch(e){status("Không gọi được VieNeu backend: "+e.message+". GitHub Pages không tự chạy Python; kiểm tra HTTPS/CORS/xác thực.","error");}
     finally{btn.disabled=false;btn.textContent="✦ Tạo giọng bằng VieNeu";}
   }
+
+  function cloudEndpoint() {
+    const configured=$("backend").value.trim();
+    if(!configured) throw Error("Cần nhập URL máy chủ BilaVoice proxy, không nhập https://api.vieneu.io/mcp.");
+    const url=new URL(configured);
+    if(url.hostname==="api.vieneu.io") throw Error("Trang BilaVoice cần proxy /api/cloud/*, không thể dùng trực tiếp địa chỉ VieNeu MCP/API trong ô backend.");
+    const local=["localhost","127.0.0.1","[::1]"].includes(url.hostname);
+    if(url.protocol!=="https:" && !(url.protocol==="http:"&&local)) throw Error("Máy chủ phải dùng HTTPS, trừ localhost.");
+    if(url.username||url.password||url.search||url.hash) throw Error("URL không được chứa token/mật khẩu hoặc query.");
+    return url.origin+url.pathname.replace(/\/$/,"");
+  }
+  function cloudHeaders() {
+    const access=$("cloudToken").value.trim();
+    if(!access) throw Error("Cần token truy cập BilaVoice proxy. Không nhập VieNeu API key tại đây.");
+    return {"X-BilaVoice-Token":access};
+  }
+  async function loadCloudVoices() {
+    const btn=$("cloudVoicesButton");
+    btn.disabled=true;
+    try {
+      const res=await fetch(cloudEndpoint()+"/api/cloud/voices",{
+        method:"GET",headers:cloudHeaders(),credentials:"omit",mode:"cors"
+      });
+      if(!res.ok) throw Error("HTTP "+res.status+": "+(await res.text()).slice(0,130));
+      const data=await res.json();
+      if(!Array.isArray(data.voices)) throw Error("Danh sách giọng không hợp lệ.");
+      const select=$("cloudVoice");select.textContent="";
+      const fallback=document.createElement("option");fallback.value="";fallback.textContent="Giọng mặc định";select.appendChild(fallback);
+      for(const v of data.voices) {
+        if(typeof v.id!=="string") continue;
+        const opt=document.createElement("option");opt.value=v.id;
+        opt.textContent=(v.name||v.id)+(v.kind==="cloned"?" · ĐÃ NHÂN BẢN":" · Danh mục");
+        select.appendChild(opt);
+      }
+      status("Đã tải "+data.voices.length+" giọng VieNeu Cloud v4, bao gồm các giọng đã được đăng ký trong tài khoản nếu có.","success");
+    }catch(e){status("Không tải được giọng Cloud: "+e.message,"error");}
+    finally{btn.disabled=false;}
+  }
+  async function cloudTts(){
+    const btn=$("cloudTtsButton"),text=$("ttsText").value.trim();
+    if(!text){status("Cần nhập Unicode để tổng hợp giọng.","error");return;}
+    if(text.length>1000||text.split(/\s+/).length>100){status("Demo Cloud giới hạn tối đa 100 từ, 1000 ký tự/lần để phù hợp key thử nghiệm.","error");return;}
+    btn.disabled=true;btn.textContent="Đang tổng hợp VieNeu Cloud v4…";
+    try{
+      const res=await fetch(cloudEndpoint()+"/api/cloud/tts",{
+        method:"POST",
+        headers:{"Content-Type":"application/json",...cloudHeaders()},
+        body:JSON.stringify({text,voice:$("cloudVoice").value}),
+        credentials:"omit",mode:"cors"
+      });
+      if(!res.ok)throw Error("HTTP "+res.status+": "+(await res.text()).slice(0,150));
+      const blob=await res.blob();
+      if(!blob.size || !blob.type.startsWith("audio/"))throw Error("VieNeu proxy không trả âm thanh.");
+      if(cloudUrl)URL.revokeObjectURL(cloudUrl);
+      cloudUrl=URL.createObjectURL(blob);
+      $("cloudAudio").src=cloudUrl;$("cloudAudio").hidden=false;
+      status("Đã tổng hợp giọng bằng VieNeu Cloud v4. Chi phí áp dụng theo gói token VieNeu.","success");
+    }catch(e){status("VieNeu Cloud thất bại: "+e.message,"error");}
+    finally{btn.disabled=false;btn.textContent="▶ Tạo giọng bằng VieNeu Cloud v4";}
+  }
   function generateFsk(){
     try{
       const cvss=$("cvnss").value;
@@ -243,10 +303,13 @@
   $("stopSpeak").addEventListener("click",()=>window.speechSynthesis?.cancel());
   $("reference").addEventListener("change",updateReference);
   $("cloneButton").addEventListener("click",clone);
+  $("cloudVoicesButton").addEventListener("click",loadCloudVoices);
+  $("cloudTtsButton").addEventListener("click",cloudTts);
   $("symbolSlider").addEventListener("input",()=>selectSymbol(Number($("symbolSlider").value)));
   $("generateFSK").addEventListener("click",generateFsk);
   $("decodeFSK").addEventListener("click",decodeFsk);
   if(!C||!A||!B||!window.CVNSSConverter){status("Thiếu mã lõi CVNSS / Ring-108.","error");return;}
+  if(["localhost","127.0.0.1"].includes(window.location.hostname) && window.location.port==="8000") $("backend").value=window.location.origin;
   selectSymbol(0);loadVoices();
   if(window.speechSynthesis)window.speechSynthesis.onvoiceschanged=loadVoices;
   setupSpeechRecognition();encode();
