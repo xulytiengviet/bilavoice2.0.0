@@ -45,23 +45,51 @@ CVNSS4.0 ──> canonical Unicode ──> Browser speechSynthesis ──> Spoke
 
 VieNeu v3 supports zero-shot reference-voice conditioning. Sample 3–8 seconds of a single speaker, typically without transcription/fine-tuning. This is **not** an end-to-end cloning-latency guarantee, and output fidelity is not universally proven. v3 Turbo can use \`tts.infer(text, ref_audio="my_voice.wav", denoise=True)\`; read current SDK docs for model and runtime requirements.
 
-## Optional local VieNeu server
+## VieNeu integration: Cloud v4 + local SDK
 
-**GitHub Pages is static: it cannot execute Python models, safely hold API keys, or serve a native VieNeu voice-cloning engine.** This repository includes an *optional* FastAPI server; it must be run on a separate computer or private server with the model installed. Recommended local-only usage:
+Public endpoint references (safe to put in HTML):
 
-\`\`\`bash
-python -m venv .venv
-# Windows CMD: .venv\Scripts\activate.bat
-# PowerShell: .venv\Scripts\Activate.ps1
-# Linux/macOS: source .venv/bin/activate
-pip install -r server/requirements.txt
-python -m uvicorn server.app:app --host 127.0.0.1 --port 8000
-\`\`\`
+- **MCP agent endpoint**: `https://api.vieneu.io/mcp` — Streamable HTTP/OAuth for AI assistants; NOT a plain speech-generating API, and NOT the BilaVoice proxy endpoint.
+- **Cloud TTS REST API**: `https://api.vieneu.io/api/v1/audio/speech` — accepts `POST` with `input`, `model: vieneu-v4`, optional `voice`, and returns MP3 bytes.
+- **BilaVoice backend**: `/api/cloud/voices` and `/api/cloud/tts` (proxy) — keeps your VieNeu credential server-side and requires a separate `BILAVOICE_CLIENT_TOKEN`.
+- **Local SDK**: `/api/tts` — for 3–8 second reference WAV; only enabled when `BILAVOICE_ENABLE_LOCAL_SDK=1` and also requires the proxy client token.
 
-Open **http://127.0.0.1:8000/** (same-origin frontend/backend), set the backend field to \`http://127.0.0.1:8000\`, and select a mono PCM16 WAV clip of 3–8 seconds. Check consent and click **Tạo giọng bằng VieNeu**. SDK/model artifacts may download on the first run; hardware capabilities and speed depend on available backend. The local application does not persist voice reference files or completed output files after successful delivery, but runtime caching and external system logs must be reviewed separately.
+VieNeu Cloud v4 clones are **enrolled in VieNeu Studio** (https://vieneu.io/#/clone) first, then appear under `GET /api/v1/voices` with `kind: cloned`. Uploading reference WAV directly to Cloud REST/MCP is not supported by the current API. By contrast, the local SDK v3 can generate from a 3–8s WAV directly. Cloud v3 was retired in September 2026 and must not be requested via REST.
 
-The example FastAPI server is deliberately **local-only**, has **no user authentication** and **no rate limiting**. Never expose it directly to the Internet. To integrate public GitHub Pages with a remote endpoint, deploy a **separately protected HTTPS backend**, explicit CORS policy, authentication/session protection, request limits, secure retention/deletion controls, and misuse prevention. Do not paste secrets into the browser URL.
+### Run the Cloud proxy on Windows (no GPU or VieNeu model download)
 
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r server\requirements-cloud.txt
+# Set VIENEU_API_KEY in the *server environment*, not HTML or GitHub:
+$secure = Read-Host 'VieNeu API key' -AsSecureString
+$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try { $env:VIENEU_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+$env:BILAVOICE_CLIENT_TOKEN = node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+# Copy the printed output locally into the website's 'BilaVoice backend token' field:
+Write-Host $env:BILAVOICE_CLIENT_TOKEN
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000/ and use `http://127.0.0.1:8000` for the proxy URL. Paste **BILAVOICE_CLIENT_TOKEN** (not **VIENEU_API_KEY**) into the separate web form field. Click **Tải danh sách giọng Cloud**, select a voice, then generate. The browser never receives the VieNeu key. The proxy limits requests to 5/min per seen IP in-process and Cloud demo inputs to 100 words; these limits are only safeguards for a single-user demo.
+
+### Run optional local VieNeu SDK (WAV cloning)
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r server\requirements.txt
+$env:BILAVOICE_ENABLE_LOCAL_SDK = '1'
+# Keep BILAVOICE_CLIENT_TOKEN from above, or set it again securely in this terminal.
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8000
+```
+
+Choose a mono PCM16 WAV of 3–8 seconds with speaker consent, enter the same proxy URL and backend client token, and press **Tạo giọng bằng VieNeu**. This is the SDK v3 pathway, NOT Cloud v4.
+
+### Deployment to GitHub Pages
+
+GitHub Pages is static and has no secret store for browser JS. The website can show **public** VieNeu URL strings, but cannot embed the `vn_test_...` or `vn_sk_...` key. A test key still consumes account tokens and enforces only a 100-word cap. Rotate any already shared key in VieNeu Developer settings and use a fresh key in the backend environment.
+
+For the public site, deploy a separate HTTPS proxy and enter its URL in the **BilaVoice backend** input. Configure allowed CORS origins to include the GitHub Pages origin. The included `BILAVOICE_CLIENT_TOKEN` is a shared-demo access gate, **not sufficient public multi-user authentication**: put real user authentication, shared rate limiting, spending limits, audit logging without keys/audio, TLS, and abuse controls in front of the service. Do not expose the local backend to the Internet unchanged.
 ## GitHub Pages
 
 \`.github/workflows/pages.yml\` runs \`npm test\` and \`node --check assets/app.js\`, then deploys the root static site. It attempts to enable Pages automatically.
