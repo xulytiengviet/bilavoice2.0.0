@@ -10,11 +10,11 @@ import wave
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from server.cloud import router as cloud_router
+from server.cloud import router as cloud_router, require_client_token
 from starlette.background import BackgroundTask
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,7 +79,11 @@ def infer_tts(
     text: str = Form(...),
     consent: bool = Form(False),
     reference: UploadFile = File(...),
+    request: Request = None,
 ):
+    if os.environ.get("BILAVOICE_ENABLE_LOCAL_SDK") != "1":
+        raise HTTPException(503, "Local SDK đang tắt; dùng Cloud v4 hoặc bật BILAVOICE_ENABLE_LOCAL_SDK=1.")
+    require_client_token(request)
     if not text.strip() or len(text) > 2000:
         raise HTTPException(400, "Văn bản đầu vào cần 1–2000 ký tự.")
     if not consent:
