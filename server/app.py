@@ -13,11 +13,25 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+from server.cloud import router as cloud_router
 from starlette.background import BackgroundTask
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_UPLOAD = 10 * 1024 * 1024
-app = FastAPI(title="BilaVoice Local VieNeu TTS", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="BilaVoice local + Cloud VieNeu bridge", docs_url="/api/docs", redoc_url=None)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://xulytiengviet.github.io",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+    ],
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-BilaVoice-Token"],
+)
+app.include_router(cloud_router)
 
 
 @lru_cache(maxsize=1)
@@ -99,4 +113,14 @@ def infer_tts(
 
 # Same-origin local app works at http://127.0.0.1:8000/ without CORS or leaked API keys.
 # Do not expose to public interface without authentication and other controls.
-app.mount("/", StaticFiles(directory=str(ROOT), html=True), name="static")
+@app.get("/", include_in_schema=False)
+def web_home():
+    return FileResponse(str(ROOT / "index.html"), media_type="text/html")
+
+# Serve only public assets. Do not expose /server, .git, private config files.
+for public_dir in ("assets", "src", "vendor"):
+    app.mount(
+        "/" + public_dir,
+        StaticFiles(directory=str(ROOT / public_dir)),
+        name="static-" + public_dir,
+    )
