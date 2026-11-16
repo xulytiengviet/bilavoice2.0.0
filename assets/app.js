@@ -198,7 +198,7 @@
     form.append("text",text);form.append("consent","true");form.append("reference",validatedReference);
     btn.disabled=true;btn.textContent="Đang gọi VieNeu…";
     try {
-      const res=await fetch(url.origin+url.pathname.replace(/\/$/,"")+"/api/tts",{method:"POST",body:form,credentials:"omit",mode:"cors"});
+      const res=await fetch(url.origin+url.pathname.replace(/\/$/,"")+"/api/tts",{method:"POST",headers:cloudHeaders(),body:form,credentials:"omit",mode:"cors"});
       if(!res.ok)throw Error("HTTP "+res.status+": "+(await res.text()).slice(0,180));
       const blob=await res.blob();if(!blob.type.includes("audio") && blob.size<44)throw Error("Backend không trả về âm thanh.");
       if(cloneUrl)URL.revokeObjectURL(cloneUrl);
