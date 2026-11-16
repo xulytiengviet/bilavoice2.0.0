@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#080c16">
+  <meta name="description" content="BilaVoice 2.0.0 — phòng thí nghiệm hai chiều Voice ↔ CVNSS4.0 ↔ Base27/Trit, Web STT/TTS và VieNeu voice cloning tùy chọn.">
+  <title>BilaVoice 2.0.0 · Voice ↔ CVNSS4.0 Laboratory</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <div class="ambient" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="#top"><span class="brand-icon">◉</span><span>BILA<span class="brand-accent">VOICE</span><small>2.0.0 · RESEARCH PREVIEW</small></span></a>
+    <nav><a href="#studio">Studio</a><a href="#signal">27-FSK</a><a href="#architecture">Kiến trúc</a><a href="#clone">VieNeu</a></nav>
+    <a class="github-link" target="_blank" rel="noopener" href="https://github.com/xulytiengviet/bilavoice2.0.0">GITHUB ↗</a>
+  </header>
+  <main id="top">
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pulse"></span> VIETNAMESE SPEECH × SYMBOLIC COMPUTING</p>
+        <h1>Biến <em>giọng nói</em><br>thành <span>ký hiệu.</span><br>Và ngược lại.</h1>
+        <p class="intro">Nền tảng thử nghiệm Voice ↔ CVNSS4.0, Base27, ba trit cân bằng và vòng 108 trạng thái. Kết hợp Web Speech và cầu nối VieNeu TTS có điều kiện sử dụng giọng tham chiếu.</p>
+        <div class="hero-actions"><a href="#studio" class="button primary">Bắt đầu thử nghiệm ↘</a><a class="button ghost" href="#architecture">Xem kiến trúc ↗</a></div>
+        <div class="capability"><span><i class="ok">●</i> CVNSS4.0 v5</span><span><i class="ok">●</i> Base27 ↔ 3 trit</span><span><i class="maybe">●</i> Web STT/TTS *</span><span><i class="maybe">●</i> VieNeu tùy chọn</span></div>
+      </div>
+      <div class="hero-visual">
+        <div class="orbit-frame"><canvas id="ring" width="660" height="660" aria-label="Vòng 108 trạng thái rời rạc biểu diễn vector"></canvas><div class="orbit-core"><span id="ringIndex">000</span><small>STATE / 108</small><strong id="ringAngle">0.0°</strong></div></div>
+        <div class="orbit-label">Z₁₀₈ ≅ Z₄ × Z₂₇ <span>·</span> 2 BIT + 3 TRIT</div>
+      </div>
+    </section>
+    <section class="stats">
+      <div class="container stat-grid"><div><b>108</b><span>Trạng thái vòng</span></div><div><b>27</b><span>Ký hiệu Base27</span></div><div><b>3</b><span>Trit / ký hiệu</span></div><div><b>3–8s</b><span>Mẫu giọng VieNeu</span></div></div>
+    </section>
+    <section class="container section" id="studio">
+      <div class="section-head"><div><p class="eyebrow">01 / BIDIRECTIONAL SPEECH LAB</p><h2>Phòng thử nghiệm <em>hai chiều</em></h2></div><p>Nhận giọng nói thành Unicode, chuẩn hóa sang CVNSS4.0 và khôi phục văn bản để tổng hợp giọng đọc. Kết quả ASR và TTS phụ thuộc trình duyệt/mô hình.</p></div>
+      <div class="studio-grid">
+        <article class="panel">
+          <div class="panel-head"><div><span class="step">01</span><h3>Voice → STT → CVNSS4.0</h3></div><span class="tag">WEB ASR</span></div>
+          <label for="transcript" class="field-label">Tiếng Việt Unicode / bản phiên âm</label>
+          <textarea id="transcript" rows="4" spellcheck="false">Tiếng Việt có dấu</textarea>
+          <div class="controls"><button id="micStart" class="button primary" type="button">◉ Bắt đầu nói</button><button id="micStop" class="button outline" type="button" disabled>Dừng thu</button><button id="encode" class="button ghost" type="button">Mã hóa ↘</button></div>
+          <p class="hint">* Web Speech API có thể không khả dụng ở một số trình duyệt và có thể dùng dịch vụ nhận dạng từ xa. Có thể nhập văn bản thủ công để thử thuật toán.</p>
+          <label for="cvnss" class="field-label top-gap">Ký hiệu CVNSS4.0 (cho phép sửa)</label>
+          <textarea id="cvnss" rows="3" spellcheck="false"></textarea>
+          <div class="controls"><button id="decode" class="button outline" type="button">CVNSS → Unicode ↗</button><button id="copySymbol" class="button ghost" type="button">Sao chép mã</button></div>
+          <div class="micro-grid">
+            <div class="readout"><small>TRITS ĐẦU TIÊN</small><code id="trits">—</code></div>
+            <div class="readout"><small>VẬT MANG BASE27</small><code id="envelope">—</code></div>
+          </div>
+          <div class="readout results"><small>KHÔI PHỤC UNICODE (CHÍNH SÁCH CANONICAL)</small><output id="decodedText">—</output></div>
+          <div class="audit" id="audit">Bộ kiểm toán các ứng viên Unicode sẽ hiển thị tại đây.</div>
+        </article>
+        <article class="panel" id="clone">
+          <div class="panel-head"><div><span class="step">02</span><h3>CVNSS4.0 → TTS → Voice</h3></div><span class="tag teal">NATURAL SPEECH</span></div>
+          <label class="field-label" for="ttsText">Văn bản Unicode đưa vào bộ đọc</label>
+          <textarea id="ttsText" rows="4" spellcheck="false">Tiếng Việt có dấu</textarea>
+          <label class="field-label top-gap" for="voiceSelect">Giọng trình duyệt</label>
+          <select id="voiceSelect"><option value="">Giọng mặc định của trình duyệt</option></select>
+          <div class="controls"><button id="speak" class="button primary" type="button">▶ Đọc bằng TTS</button><button id="stopSpeak" class="button outline" type="button">■ Dừng đọc</button></div>
+          <div class="separator"><span>VOICE CLONING / V I E N E U</span></div>
+          <p class="hint">VieNeu sử dụng âm thanh mẫu của một người nói (3–8 giây) để tạo giọng TTS. GitHub Pages không chạy mô hình Python; phần này yêu cầu máy chủ HTTPS riêng, hoặc chạy ứng dụng cùng backend trên localhost.</p>
+          <label class="field-label top-gap" for="reference">Tệp giọng tham chiếu (WAV, 3–8 giây, mono PCM)</label>
+          <input id="reference" type="file" accept=".wav,audio/wav">
+          <p id="referenceStatus" class="hint">Chưa chọn mẫu. Không tự động tải mẫu lên máy chủ.</p>
+          <audio id="referencePreview" controls hidden></audio>
+          <label class="field-label top-gap" for="backend">URL máy chủ VieNeu (đã bảo vệ bằng xác thực nếu công khai)</label>
+          <input id="backend" type="url" placeholder="https://your-secure-backend.example">
+          <div class="consent"><label><input type="checkbox" id="consent"> Tôi là chủ sở hữu giọng nói hoặc có sự đồng ý rõ ràng của người nói và có quyền sử dụng mẫu này.</label></div>
+          <button id="cloneButton" class="button accent full" type="button">✦ Tạo giọng bằng VieNeu</button>
+          <audio id="cloneOutput" controls hidden></audio>
+          <p class="hint">Mẫu chỉ được gửi khi bấm nút tạo giọng. Vui lòng không sử dụng để mạo danh hoặc nhân bản giọng người khác khi chưa được phép.</p>
+        </article>
+      </div>
+      <div id="appStatus" class="status" role="status" aria-live="polite">Sẵn sàng. Mời thử nhập văn bản hoặc bật microphone.</div>
+    </section>
+    <section class="container section" id="signal">
+      <div class="section-head"><div><p class="eyebrow">02 / DETERMINISTIC ACOUSTIC CHANNEL</p><h2>Mã ký hiệu thành <em>sóng 27-FSK</em></h2></div><p>Đây là âm thanh truyền dữ liệu số, <strong>không phải giọng nói tự nhiên</strong>. Khung có preamble, độ dài và CRC-16 được kiểm thử bằng Goertzel.</p></div>
+      <div class="signal-grid">
+        <div class="panel">
+          <div class="panel-head"><div><span class="step">03</span><h3>CVNSS4.0 ↔ WAV dữ liệu</h3></div><span class="tag">27-FSK / PCM16</span></div>
+          <div class="signal-meta"><span>24 kHz</span><span>100 ms/ký hiệu</span><span>27 tần số 600–2680 Hz</span></div>
+          <div class="controls"><button id="generateFSK" class="button primary" type="button">Tạo WAV tín hiệu</button><button id="decodeFSK" class="button outline" type="button" disabled>Giải mã & CRC</button></div>
+          <p class="hint">Envelope VCR v1 dùng 2 ký hiệu Base27 cho mỗi byte UTF-8; bảo toàn cả dấu câu, chữ thường và nội dung mã CVNSS.</p>
+          <audio id="fskPlayer" controls hidden></audio>
+          <div class="micro-grid"><div class="readout"><small>ĐỘ DÀI TÍN HIỆU</small><strong id="duration">—</strong></div><div class="readout"><small>KHÔI PHỤC</small><strong id="crc">—</strong></div></div>
+          <div class="readout"><small>CVNSS4.0 NHẬN LẠI</small><output id="fskDecoded">—</output></div>
+        </div>
+        <div class="panel chart-panel">
+          <div class="panel-head"><div><span class="step">04</span><h3>Vector trên vòng tròn 360°</h3></div><span class="tag teal">RING-108</span></div>
+          <p class="hint">Chọn một ký hiệu Base27 từ kết quả để quan sát tọa độ cực. Góc quay không mang ý nghĩa âm vị hay giọng nói nếu chưa học/định nghĩa thêm.</p>
+          <label class="field-label" for="symbolSlider">Chỉ số ký hiệu trong bảng Base27 <output id="symbolNumber">0</output></label>
+          <input id="symbolSlider" type="range" min="0" max="26" value="0">
+          <div class="readout"><small>θ = 2πj / 27</small><output id="vectorDetails">j=0 · (1, 0)</output></div>
+          <canvas id="waveCanvas" width="850" height="240" aria-label="Dạng sóng 27-FSK mô phỏng"></canvas>
+        </div>
+      </div>
+    </section>
+    <section class="container section" id="architecture">
+      <div class="section-head"><div><p class="eyebrow">03 / VERIFIED SYSTEM DESIGN</p><h2>Một hệ thống, <em>hai loại âm thanh</em></h2></div><p>Phân biệt biểu diễn văn bản/kênh tín hiệu số với mô hình nhận dạng và tổng hợp tiếng nói có ngữ điệu, ngữ cảnh và đặc trưng người nói.</p></div>
+      <div class="pipeline">
+        <div><span class="phase">NHẬN</span><b>Voice (micro)</b><span>→</span><b>STT</b><span>→</span><b>Unicode</b><span>→</span><b>CVNSS4.0</b><span>→</span><b>Base27/3-trit</b></div>
+        <div><span class="phase">TẠO</span><b>Base27/3-trit</b><span>→</span><b>CVNSS4.0</b><span>→</span><b>Unicode</b><span>→</span><b>VieNeu / Browser TTS</b><span>→</span><b>Voice</b></div>
+        <div><span class="phase alt">TRUYỀN</span><b>CVNSS4.0</b><span>→</span><b>27-FSK WAV</b><span>→</span><b>CRC / Goertzel</b><span>→</span><b>CVNSS4.0</b></div>
+      </div>
+      <div class="explain-grid">
+        <article><h3>Đã kiểm chứng theo cấu trúc</h3><p>Z₁₀₈ ≅ Z₄ × Z₂₇; ánh xạ j ↔ 3 trit, byte UTF-8 ↔ 2 chữ số Base27, khung sóng số với CRC. Bộ thử nghiệm không suy ra chất lượng TTS/STT.</p></article>
+        <article><h3>Giới hạn cần công bố</h3><p>CVNSS4.0 có những ánh xạ nhiều-một; giải Unicode theo quy tắc canonical có thể khác nguồn. STT có lỗi nhận dạng, và TTS không khôi phục được waveform gốc từ mã văn bản.</p></article>
+        <article><h3>Thước đo nghiên cứu</h3><p>WER/CER và lỗi thanh điệu cho STT, MOS và tương đồng người nói cho TTS, SER/BER theo SNR, độ trễ và thời gian chạy thực tế. Không mặc định tất cả đạt 100%.</p></article>
+      </div>
+    </section>
+  </main>
+  <footer class="container footer"><div><b>◉ BILAVOICE 2.0.0</b><p>Voice ↔ CVNSS4.0 · Base27 · Ternary · Ring-108</p><small>Long Ngo · Open Research 2026 · Prototype, not a certified ASR/TTS system.</small></div><div><a href="https://xulytiengviet.github.io/kientrucvong/" target="_blank" rel="noopener">KIẾN TRÚC VÒNG ↗</a><a href="https://docs.vieneu.io/vi/docs/sdk/voice-cloning/" target="_blank" rel="noopener">VIENEU DOCS ↗</a><a href="https://github.com/xulytiengviet/bilavoice2.0.0" target="_blank" rel="noopener">SOURCE ↗</a></div></footer>
+  <script src="vendor/cvnss4_0_converter.v5.js"></script>
+  <script src="src/core.js"></script>
+  <script src="src/audio.js"></script>
+  <script src="src/voice-bridge.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>
