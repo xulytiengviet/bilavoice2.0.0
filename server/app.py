@@ -14,12 +14,13 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from server import f5
 from server.cloud import router as cloud_router, require_client_token
 from starlette.background import BackgroundTask
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_UPLOAD = 10 * 1024 * 1024
-app = FastAPI(title="BilaVoice local + Cloud VieNeu bridge", docs_url="/api/docs", redoc_url=None)
+app = FastAPI(title="BilaVoice local + Cloud VieNeu bridge", version="3.0.0", docs_url="/api/docs", redoc_url=None)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -38,7 +39,7 @@ app.include_router(cloud_router)
 def vieneu_engine():
     try:
         from vieneu import Vieneu
-        return Vieneu()  # SDK default backend/model; select v3 in installed version.
+        return Vieneu(mode="v3turbo")
     except Exception as exc:
         raise HTTPException(503, f"Không khởi tạo được VieNeu SDK: {type(exc).__name__}") from exc
 
@@ -71,7 +72,9 @@ def persist_pcm_reference(upload: UploadFile) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ready", "mode": "local", "model": "VieNeu SDK"}
+    return {"status": "ready", "mode": "local", "model": "VieNeu SDK", "version": app.version,
+            "enabled": {"vieneu": os.getenv("BILAVOICE_ENABLE_LOCAL_SDK") == "1",
+                        "f5": os.getenv("BILAVOICE_ENABLE_F5") == "1"}}
 
 
 @app.post("/api/tts")
@@ -79,26 +82,40 @@ def infer_tts(
     request: Request,
     text: str = Form(...),
     consent: bool = Form(False),
-    reference: UploadFile = File(...),
+    reference: UploadFile | None = File(None),
+    engine: str = Form("vieneu"),
+    ref_text: str = Form(""),
 ):
-    if os.environ.get("BILAVOICE_ENABLE_LOCAL_SDK") != "1":
-        raise HTTPException(503, "Local SDK đang tắt; dùng Cloud v4 hoặc bật BILAVOICE_ENABLE_LOCAL_SDK=1.")
     require_client_token(request)
+    if engine not in ("vieneu", "vieneu-preset", "f5"):
+        raise HTTPException(400, "Bộ đọc không hợp lệ.")
+    flag = "BILAVOICE_ENABLE_F5" if engine == "f5" else "BILAVOICE_ENABLE_LOCAL_SDK"
+    if os.getenv(flag) != "1":
+        raise HTTPException(503, f"Bộ đọc đang tắt. Bật {flag}=1 trên máy chủ.")
     if not text.strip() or len(text) > 2000:
         raise HTTPException(400, "Văn bản đầu vào cần 1–2000 ký tự.")
-    if not consent:
+    if engine == "f5" and not 1 <= len(ref_text.strip()) <= 1000:
+        raise HTTPException(400, "F5 cần bản chép lời mẫu dài 1–1000 ký tự.")
+    needs_sample = engine != "vieneu-preset"
+    if needs_sample and reference is None:
+        raise HTTPException(400, "Cần tệp WAV tham chiếu.")
+    if needs_sample and not consent:
         raise HTTPException(403, "Cần quyền sử dụng mẫu giọng.")
-    ref_path = persist_pcm_reference(reference)
+    ref_path = persist_pcm_reference(reference) if needs_sample else None
     output_path = None
     try:
         fd, path = tempfile.mkstemp(prefix="bv-out-", suffix=".wav")
         os.close(fd)
         output_path = Path(path)
-        tts = vieneu_engine()
-        speech = tts.infer(text, ref_audio=str(ref_path), denoise=True)
-        tts.save(speech, str(output_path))
+        if engine == "f5":
+            f5.synthesize(text, ref_path, ref_text.strip(), output_path)
+        else:
+            tts = vieneu_engine()
+            options = {"ref_audio": str(ref_path), "denoise": True} if needs_sample else {}
+            speech = tts.infer(text, **options)
+            tts.save(speech, str(output_path))
         if not output_path.exists() or output_path.stat().st_size < 44:
-            raise RuntimeError("VieNeu không tạo WAV hợp lệ.")
+            raise RuntimeError("Bộ đọc không tạo WAV hợp lệ.")
         return FileResponse(
             str(output_path),
             media_type="audio/wav",
@@ -112,7 +129,8 @@ def infer_tts(
         if output_path: output_path.unlink(missing_ok=True)
         raise HTTPException(503, f"TTS lỗi: {type(exc).__name__}; xem log máy chủ.") from exc
     finally:
-        ref_path.unlink(missing_ok=True)
+        if ref_path:
+            ref_path.unlink(missing_ok=True)
 
 
 # Same-origin local app works at http://127.0.0.1:8000/ without CORS or leaked API keys.

@@ -1,4 +1,4 @@
-/* BilaVoice 2.0.0 · MIT · Long Ngo · 2026
+/* BilaVoice 3.0.0 · MIT · Long Ngo · 2026
  * Human speech uses Web Speech / an optional VieNeu backend.
  * 27-FSK is a deterministic DATA carrier and is not spoken Vietnamese.
  */
@@ -183,30 +183,32 @@
     }catch(e){$("referenceStatus").textContent="Mẫu không hợp lệ: "+e.message;status(e.message,"error");}
   }
   async function clone(){
-    const btn=$("cloneButton");const base=$("backend").value.trim();
-    const text=$("ttsText").value.trim();
-    if(!text || text.length>2000){status("VieNeu yêu cầu văn bản 1–2000 ký tự trong bản demo.","error");return;}
-    if(!validatedReference || !$("consent").checked){status("Cần WAV 3–8 giây hợp lệ và sự đồng ý sử dụng giọng nói.","error");return;}
-    let url;
-    try{
-      url=new URL(base);
-      const local=["localhost","127.0.0.1","[::1]"].includes(url.hostname);
-      if(url.protocol!=="https:" && !(url.protocol==="http:" && local))throw Error("Backend phải dùng HTTPS, trừ localhost.");
-      if(url.username||url.password)throw Error("Không đặt bí mật trong URL.");
-    }catch(e){status("Địa chỉ backend VieNeu không hợp lệ: "+e.message,"error");return;}
+    const btn=$("cloneButton"), engine=$("engine").value;
+    const text=$("ttsText").value.trim(), transcript=$("refText").value.trim();
+    if(!text || text.length>2000){status("Nhập văn bản từ 1 đến 2000 ký tự.","error");return;}
     const form=new FormData();
-    form.append("text",text);form.append("consent","true");form.append("reference",validatedReference);
-    btn.disabled=true;btn.textContent="Đang gọi VieNeu…";
+    form.append("engine",engine);
+    form.append("text",text);
+    if(engine!=="vieneu-preset"){
+      if(!validatedReference || !$("consent").checked){status("Cần WAV hợp lệ và quyền sử dụng mẫu.","error");return;}
+      form.append("consent","true");
+      form.append("reference",validatedReference);
+    }
+    if(engine==="f5"){
+      if(!transcript){status("Nhập bản chép lời mẫu cho F5.","error");return;}
+      form.append("ref_text",transcript);
+    }
+    btn.disabled=true;btn.textContent="Đang tổng hợp…";
     try {
-      const res=await fetch(url.origin+url.pathname.replace(/\/$/,"")+"/api/tts",{method:"POST",headers:cloudHeaders(),body:form,credentials:"omit",mode:"cors"});
+      const res=await fetch(cloudEndpoint()+"/api/tts",{method:"POST",headers:cloudHeaders(),body:form,credentials:"omit",mode:"cors"});
       if(!res.ok)throw Error("HTTP "+res.status+": "+(await res.text()).slice(0,180));
-      const blob=await res.blob();if(!blob.type.includes("audio") && blob.size<44)throw Error("Backend không trả về âm thanh.");
+      const blob=await res.blob();if(!blob.type.startsWith("audio/") || blob.size<44)throw Error("Backend không trả về âm thanh.");
       if(cloneUrl)URL.revokeObjectURL(cloneUrl);
       cloneUrl=URL.createObjectURL(blob);
       $("cloneOutput").src=cloneUrl;$("cloneOutput").hidden=false;
-      status("VieNeu đã trả về file giọng đọc. Hãy nghe và tự đánh giá tương đồng người nói.","success");
-    }catch(e){status("Không gọi được VieNeu backend: "+e.message+". GitHub Pages không tự chạy Python; kiểm tra HTTPS/CORS/xác thực.","error");}
-    finally{btn.disabled=false;btn.textContent="✦ Tạo giọng bằng VieNeu";}
+      status("Đã tạo tệp giọng đọc cục bộ.","success");
+    }catch(e){status("Không gọi được bộ đọc cục bộ: "+e.message+". GitHub Pages không tự chạy Python; kiểm tra HTTPS/CORS/xác thực.","error");}
+    finally{btn.disabled=false;btn.textContent="Tạo giọng cục bộ";}
   }
 
   function cloudEndpoint() {
@@ -301,6 +303,12 @@
   $("copySymbol").addEventListener("click",async()=>{try{await navigator.clipboard.writeText($("cvnss").value);status("Đã sao chép CVNSS4.0.","success");}catch(e){status("Không thể sao chép: "+e.message,"error");}});
   $("speak").addEventListener("click",speak);
   $("stopSpeak").addEventListener("click",()=>window.speechSynthesis?.cancel());
+  function updateEngine(){
+    $("sampleFields").hidden=$("engine").value==="vieneu-preset";
+    $("transcriptField").hidden=$("engine").value!=="f5";
+  }
+  $("engine").addEventListener("change",updateEngine);
+  updateEngine();
   $("reference").addEventListener("change",updateReference);
   $("cloneButton").addEventListener("click",clone);
   $("cloudVoicesButton").addEventListener("click",loadCloudVoices);

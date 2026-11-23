@@ -1,10 +1,39 @@
-# BilaVoice 2.0.0 · Voice ↔ CVNSS4.0
+# BilaVoice 3.0.0 · Voice ↔ CVNSS4.0
 
 **Tiếng Việt | Open research prototype | Long Ngo | November 2026**
 
 Phòng thí nghiệm hai chiều trên GitHub Pages: **giọng nói → STT → Unicode → CVNSS4.0 → Base27/3 trit**, đồng thời **CVNSS4.0 → Unicode → TTS → giọng đọc**. Kiến trúc kế thừa mã kiểm toán của [Kiến Trúc Vòng](https://github.com/xulytiengviet/kientrucvong) và tích hợp tùy chọn [VieNeu voice cloning](https://docs.vieneu.io/vi/docs/sdk/voice-cloning/) trên backend cục bộ.
 
 **Xem trang khi GitHub Pages đã được kích hoạt:** https://xulytiengviet.github.io/bilavoice2.0.0/
+
+## Phiên bản 3.0.0
+
+Trong **Studio → Chọn bộ đọc**, VieNeu v3 Turbo có thể đọc bằng giọng mặc định hoặc theo mẫu. F5-ViVoice đọc theo mẫu WAV PCM16 mono 3–8 giây kèm bản chép lời. Điền URL backend và token dùng chung trước khi bấm **Tạo giọng cục bộ**. Trên Pages, giọng trình duyệt hoạt động độc lập với máy chủ Python.
+
+| Giá trị `engine` gửi tới `POST /api/tts` | Dữ liệu ngoài `text` | Công tắc trên backend |
+|---|---|---|
+| `vieneu-preset` | Không cần mẫu | `BILAVOICE_ENABLE_LOCAL_SDK=1` |
+| `vieneu` (mặc định cho client 2.x) | `reference`, `consent=true` | `BILAVOICE_ENABLE_LOCAL_SDK=1` |
+| `f5` | `reference`, `ref_text`, `consent=true` | `BILAVOICE_ENABLE_F5=1` |
+
+API nhận multipart/form-data, xác thực bằng header `X-BilaVoice-Token`, trả WAV. Cả hai bộ đọc nhận văn bản Unicode đã giải mã. Xem [VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) và [trọng số v3 Turbo, Apache-2.0](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Turbo).
+
+### Cấu hình F5-ViVoice trên Windows
+
+1. Chạy backend theo hướng dẫn Cloud bên dưới với `requirements-cloud.txt` và `BILAVOICE_CLIENT_TOKEN`. Riêng đường F5 không cần khóa VieNeu.
+2. Trong môi trường Python 3.10 riêng, cài PyTorch phù hợp phần cứng, FFmpeg, SoX và bản fork [F5-TTS-Vietnamese](https://github.com/nguyenthienhy/F5-TTS-Vietnamese) theo hướng dẫn của tác giả. Xác nhận lệnh `f5-tts_infer-cli --help` hoạt động. CLI chạy tiến trình riêng cho mỗi yêu cầu và nạp lại trọng số.
+3. Tải `model_last.pt` và `config.json` từ [hynt/F5-TTS-Vietnamese-ViVoice](https://huggingface.co/hynt/F5-TTS-Vietnamese-ViVoice). Theo hướng dẫn của tác giả, lưu bản sao của `config.json` thành `vocab.txt`. Trọng số dùng cho nghiên cứu phi thương mại theo CC BY-NC-SA 4.0.
+4. Trong PowerShell của backend, thay đường dẫn ví dụ bằng vị trí thực tế rồi khởi động lại backend:
+
+```powershell
+$env:BILAVOICE_ENABLE_F5 = '1'
+$env:BILAVOICE_F5_CLI = 'C:/tts/f5-env/Scripts/f5-tts_infer-cli.exe'
+$env:BILAVOICE_F5_CHECKPOINT = 'C:/tts/ViVoice/model_last.pt'
+$env:BILAVOICE_F5_VOCAB = 'C:/tts/ViVoice/vocab.txt'
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8000
+```
+
+Lần chạy đầu cần tải thêm Vocos nếu máy chưa có cache. Để thử hai bộ đọc trên cùng một giọng, dùng cùng WAV, văn bản đích và bản chép lời chính xác cho F5.
 
 ## Chạy thử tại trình duyệt
 
@@ -31,6 +60,7 @@ Voice WAV / microphone ───> Web Speech ASR ───> Vietnamese Unicode
                       27-FSK / Goertzel / CRC16 (DATA channel only)
 
 CVNSS4.0 ──> canonical Unicode ──> Browser speechSynthesis ──> Spoken voice
+                                   ├──> F5-ViVoice + reference transcript ──> Cloned voice
                                    └──> VieNeu SDK with 3–8s reference ──> Cloned voice
 \`\`\`
 
@@ -52,7 +82,7 @@ Public endpoint references (safe to put in HTML):
 - **MCP agent endpoint**: `https://api.vieneu.io/mcp` — Streamable HTTP/OAuth for AI assistants; NOT a plain speech-generating API, and NOT the BilaVoice proxy endpoint.
 - **Cloud TTS REST API**: `https://api.vieneu.io/api/v1/audio/speech` — accepts `POST` with `input`, `model: vieneu-v4`, optional `voice`, and returns MP3 bytes.
 - **BilaVoice backend**: `/api/cloud/voices` and `/api/cloud/tts` (proxy) — keeps your VieNeu credential server-side and requires a separate `BILAVOICE_CLIENT_TOKEN`.
-- **Local SDK**: `/api/tts` — for 3–8 second reference WAV; only enabled when `BILAVOICE_ENABLE_LOCAL_SDK=1` and also requires the proxy client token.
+- **Local SDK**: `/api/tts` — for preset or 3–8 second reference WAV; only enabled when `BILAVOICE_ENABLE_LOCAL_SDK=1` and also requires the proxy client token.
 
 VieNeu Cloud v4 clones are **enrolled in VieNeu Studio** (https://vieneu.io/#/clone) first, then appear under `GET /api/v1/voices` with `kind: cloned`. Uploading reference WAV directly to Cloud REST/MCP is not supported by the current API. By contrast, the local SDK v3 can generate from a 3–8s WAV directly. Cloud v3 was retired in September 2026 and must not be requested via REST.
 
@@ -83,7 +113,7 @@ $env:BILAVOICE_ENABLE_LOCAL_SDK = '1'
 .\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8000
 ```
 
-Choose a mono PCM16 WAV of 3–8 seconds with speaker consent, enter the same proxy URL and backend client token, and press **Tạo giọng bằng VieNeu**. This is the SDK v3 pathway, NOT Cloud v4.
+Choose a mono PCM16 WAV of 3–8 seconds with speaker consent, enter the same proxy URL and backend client token, and press **Tạo giọng cục bộ**. This is the SDK v3 pathway, NOT Cloud v4.
 
 ### Deployment to GitHub Pages
 
